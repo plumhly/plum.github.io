@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="zh-cn"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> 探索iOS事件处理 · plum的技术博客</title><meta name="description" content="探索iOS事件处理 - plum"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/apollo.css"><link rel="search" type="application/opensearchdescription+xml" href="http://yoursite.com/atom.xml" title="plum的技术博客"></head><body><div class="wrap"><header><a href="/" class="logo-link"><img src="/favicon.png" alt="logo"></a><ul class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" class="nav-list-link">BLOG</a></li><li class="nav-list-item"><a href="/archives/" target="_self" class="nav-list-link">ARCHIVE</a></li><li class="nav-list-item"><a href="http://weibo.com/plummit" target="_blank" class="nav-list-link">WEIBO</a></li><li class="nav-list-item"><a href="https://github.com/plumhly" target="_blank" class="nav-list-link">GITHUB</a></li><li class="nav-list-item"><a href="/atom.xml" target="_self" class="nav-list-link">RSS</a></li></ul></header><main class="container"><div class="post"><article class="post-block"><h1 class="post-title">探索iOS事件处理</h1><div class="post-info">2017年6月27日</div><div class="post-content"><h1 id="探索iOS事件处理"><a href="#探索iOS事件处理" class="headerlink" title="探索iOS事件处理"></a>探索iOS事件处理</h1><blockquote>
+<p>当我们点击<code>button</code>的时候，然后触发动作，这个过程表面上看似简单，但背后的流程是否真的弄明白了？是否我们可以用这些知识做一些什么功能呢？</p>
+</blockquote>
+<h3 id="原理分析"><a href="#原理分析" class="headerlink" title="原理分析"></a>原理分析</h3><p>首先，分为四个过程来分析:</p>
+<ul>
+<li><strong>事件产生</strong></li>
+<li><strong>事件分发</strong></li>
+<li><strong>事件目标确定</strong></li>
+<li><strong>事件传递</strong></li>
+</ul>
+<p><br></p>
+<h4 id="事件产生"><a href="#事件产生" class="headerlink" title="事件产生"></a>事件产生</h4><p>当用户生成的事件发生时，<code>UIKit</code>会创建一个事件对象，其中包含处理事件所需的信息。然后它将事件对象放入活动应用程序的事件队列中。对于触摸事件，该对象是一组打包在<code>UIEvent</code>对象中的触摸。对于运动事件，事件对象根据您使用的框架和您感兴趣的运动事件类型而异。事件的类型有 <code>TouchEvent</code>、<code>MotionEvent</code>、<code>RemotionEvent</code>。</p>
+<h4 id="事件分发"><a href="#事件分发" class="headerlink" title="事件分发"></a>事件分发</h4><p><code>UIApplication</code>把事件充事件队列中拿出来，通过方法<code>sendEvent:</code>分发给<code>UIWindow</code>，然后<code>UIWindow</code>在调用方法<code>sendEvent:</code>发送给里面的控件。我们可以重写<code>sendEvent:</code>方法，来做一些事情，但是务必调用<code>[super sendEvent：theEvent]</code>。</p>
+<h4 id="事件目标确定"><a href="#事件目标确定" class="headerlink" title="事件目标确定"></a>事件目标确定</h4><p>怎样才能知道到底谁来处理这个事件呢？也就怎样寻找<code>FirstResponder</code>？<code>UIView</code>有个分类，里面有两个方法：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">- (<span class="built_in">UIView</span> *)hitTest:(<span class="built_in">CGPoint</span>)point withEvent:(<span class="built_in">UIEvent</span> *)event;</span><br><span class="line">- (<span class="built_in">BOOL</span>)pointInside:(<span class="built_in">CGPoint</span>)point withEvent:(<span class="built_in">UIEvent</span> *)event;</span><br></pre></td></tr></table></figure>
+<p>父视图通过向子视图发送<code>pointInside: withEvent:</code>来判断是否触摸的点在子视图的bounds里面。然后通过消息<code>hitTest: withEvent:</code> 返回的<code>View</code>来处理这个事件。</p>
+<h4 id="事件传递"><a href="#事件传递" class="headerlink" title="事件传递"></a>事件传递</h4><p>但是如果<code>firstResponder</code>不处理事件，那么事件就会通过响应链（<code>response chain</code>）传递下去。应用程序使用响应者对象接收和处理事件。响应者对象是<code>UIResponder</code>类的任何实例，子类包括<code>UIView</code>，<code>UIViewController</code>和<code>UIApplication</code>。响应链的传递如下图。<br><img src="/2017/06/27/探索iOS事件处理/2.png" alt=""><br>传递的规则如下：</p>
+<ul>
+<li><code>UIView</code>对象。如果视图是视图控制器的根视图，则下一个响应者是视图控制器;否则，下一个响应者是视图的父视图。</li>
+<li><code>UIViewController</code>对象。<br><ul>
+<li>如果视图控制器的视图是窗口的根视图，则下一个响应者是窗口对象。</li>
+<li>如果视图控制器由另一个视图控制器呈现，则下一个响应者是<br>呈现视图控制器。</li>
+</ul>
+</li>
+<li><code>UIWindow</code>对象。窗口的下一个响应者是UIApplication对象。</li>
+<li><code>UIApplication</code>对象。下一个响应者是应用程序委托，但前提是应用程序委托是UIResponder的实例，并且不是视图，视图控制器或应用程序对象本身。</li>
+</ul>
+<p>如果想改变响应链路径，可以重写<code>nextResponder</code>;</p>
+<h3 id="功能应用"><a href="#功能应用" class="headerlink" title="功能应用"></a>功能应用</h3><p>通过原理分析，我们可以得出一个结论和两个功能应用。</p>
+<ol>
+<li><p>UIButton不能响应事件的情况 </p>
+<ul>
+<li><code>hidden = YES</code></li>
+<li><code>alpha &lt; 0.01</code></li>
+<li><code>点击区域超出父视图</code></li>
+</ul>
+</li>
+<li><p>扩大UIButton的响应区域<br> 需要重写 <code>pointInside: withEvent:</code>,然后判断点位是否在响应的区域内。代码如下：</p>
+ <figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">- (<span class="built_in">BOOL</span>)pointInside:(<span class="built_in">CGPoint</span>)point withEvent:(<span class="built_in">UIEvent</span> *)event &#123;</span><br><span class="line">    <span class="comment">//点击区域各个方向增加 50，这里需要看UIEdgeInsetsMake的实现</span></span><br><span class="line">    <span class="built_in">CGRect</span> rect = <span class="built_in">UIEdgeInsetsInsetRect</span>(<span class="keyword">self</span>.bounds, <span class="built_in">UIEdgeInsetsMake</span>(<span class="number">-50</span>, <span class="number">-50</span>, <span class="number">-50</span>, <span class="number">-50</span>));</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">CGRectContainsPoint</span>(rect, point);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>做一个滑动展示图<br>效果图如下:<br><img src="/2017/06/27/探索iOS事件处理/3.png" alt=""><br>实现这个最简单的就是使用一个<code>UIScrollView</code>,然后设置属性</p>
+ <figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">clipToBounds = <span class="literal">NO</span>;</span><br><span class="line">pagingEnabled = <span class="literal">YES</span>;</span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<p>再把<code>内容视图</code>和<code>UIScrollView</code>按照要求：<br><code>内容宽 + padding  = scrollview宽度</code>；<br>需要注意的是<code>第一个视图</code>和<code>最后一个视图</code>相距scrollView的content距离为 <code>padding/2</code>,这样才能有居中效果。</p>
+<p><a href="https://github.com/plumhly/HitTest_Ex" target="_blank" rel="noopener">实验Demo</a></p>
+<h3 id="参考资料："><a href="#参考资料：" class="headerlink" title="参考资料："></a>参考资料：</h3><ul>
+<li><a href="https://developer.apple.com/documentation/uikit/touches_presses_and_gestures/understanding_event_handling_responders_and_the_responder_chain?language=objc" target="_blank" rel="noopener">Understanding Event Handling, Responders, and the Responder Chain</a></li>
+<li><a href="http://tech.glowing.com/cn/practice-in-uiscrollview/" target="_blank" rel="noopener">UIScrollView 实践经验</a></li>
+</ul>
+</div></article></div></main><footer><div class="paginator"><a href="/2017/05/23/KVC探索与实践/" class="next">下一篇</a></div><div class="copyright"><p>© 2015 - 2018 <a href="http://yoursite.com">plum</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and <a href="https://github.com/pinggod/hexo-theme-apollo" target="_blank">hexo-theme-apollo</a>.</p></div></footer></div><script async src="//cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script></body></html>
